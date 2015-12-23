@@ -406,9 +406,9 @@ void setup() {
   end_c[0] = 0x1a;
   end_c[1] = '\0';
   Serial.begin(9600);
-  // while (!Serial) {
-  //   ; // wait for serial port to connect. Needed for Leonardo only
-  // }
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Leonardo only
+  }
   Serial.println("Initializing SD card...");
   if (!SD.begin(chipSelect)) {
     Serial.println("initialization failed!");
@@ -530,6 +530,18 @@ void printDirectory(File dir, int numTabs) {
   Serial.println("total " +String(totalFile) +" File");
   count=0; totalFile=0;
 }
+int deleteAllFiles(){
+  int nr = 1;
+  char filename[16];
+  while(nr <= 300){
+    sprintf(filename, "IMAGE%03d.JPG", nr);
+    if(SD.remove(filename)){
+      Serial.print(filename);
+      Serial.println(" removed");
+    }
+    nr++;
+  }
+}
 int snapPicture(int count){
   digitalWrite(cameraProcess, LOW);
   Serial.println("VC0706 Camera snapshot test");
@@ -579,7 +591,7 @@ int snapPicture(int count){
   // Create an image with the name IMAGExxx.JPG
   char filename[16];
   //strcpy(filename, "IMAGE");
-  unsigned int nr = 1;  
+  int nr = 1;  
   
   while (nr != 0)
   {
@@ -588,7 +600,13 @@ int snapPicture(int count){
     if (SD.exists(filename) == false) break;
     Serial.print(filename);
     Serial.println(" exists.");
-    nr++;
+    if(nr >= 300){
+        deleteAllFiles();
+        nr = 1;
+    }
+    else{
+      nr++;
+    }
     //strcpy(filename, "IMAGE%d.JPG", i);
     // filename[5] = '0' + i%100;
     // filename[6] = '0' + i/10;
@@ -1333,6 +1351,9 @@ int encodeJPGToB64(String jpgFile, String b64File) {
  unsigned char in[3],out[4]; int i,len,blocksout=0;
  me = ""; mm=0; chara=0; 
  File picture = SD.open(jpgFile, FILE_READ);
+ if(SD.exists(b64File)){
+    SD.remove(b64File);
+ }
  File encodeFile = SD.open(b64File, FILE_WRITE);
 
  digitalWrite(encodeProcess, LOW);

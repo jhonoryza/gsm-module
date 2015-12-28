@@ -1112,9 +1112,9 @@ int connectGPRS(){
   Serial.println("grps disconnected");
   Serial.println("reconnect");
   gprsDisconnect = true;
-  digitalWrite(GSM_RESET, LOW);
-  delay(105);
-  digitalWrite(GSM_RESET, HIGH);
+  // digitalWrite(GSM_RESET, LOW);
+  // delay(105);
+  // digitalWrite(GSM_RESET, HIGH);
   if(sapbrFunction() == 1){
     char aa[apnName.length()+1];
     apnName.toCharArray(aa, apnName.length()+1);
@@ -1159,6 +1159,32 @@ void checkGPRSConnection(){
           else if(message.toInt() == 1){
             gprsDisconnect = false;
             Serial.println("grps still connected");
+          } 
+          break;
+  }
+  gsm.SimpleWriteln("AT+SAPBR=2,1");
+  switch (gsm.WaitResp(500, 100, "OK")) {
+        case RX_TMOUT_ERR:
+          break;
+        case RX_FINISHED_STR_NOT_RECV:
+          break;
+        case RX_FINISHED_STR_RECV:
+          String aa = (char*)gsm.comm_buf;
+          int firstQuotation = aa.indexOf(',');
+          int secondQuotation = aa.indexOf(',', firstQuotation+1);
+          char buff[aa.length()];
+          aa.toCharArray(buff,aa.length());
+          String message="";
+          for(int m=firstQuotation+1; m<secondQuotation; m++)
+          message = buff[m];
+          Serial.println(message);
+          if(message.toInt() == 3){
+            gprsDisconnect = true;
+            connectGPRS();
+          } 
+          else if(message.toInt() == 1){
+            gprsDisconnect = false;
+            Serial.println("sapbr still connected");
           } 
           break;
   }

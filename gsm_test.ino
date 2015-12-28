@@ -1177,7 +1177,6 @@ void checkGPRSConnection(){
           String message="";
           for(int m=firstQuotation+1; m<secondQuotation; m++)
           message = buff[m];
-          Serial.println(message);
           if(message.toInt() == 3){
             gprsDisconnect = true;
             connectGPRS();

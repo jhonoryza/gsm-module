@@ -818,7 +818,7 @@ int sapbrFunction(){
 }
 int sendImage(String filename, String imageName){
     digitalWrite(uploadProcess, LOW);
-    checkGPRSConnection();
+    connectGPRS();
     if(gprsDisconnect == false){
         gsm.SimpleWriteln("AT+SMTPSRV="+smtp_server+","+smtp_port);
         switch (gsm.WaitResp(500, 100, "OK")) {

@@ -379,6 +379,11 @@ int readDeviceSettings(){
   }
 }
 void setup() {
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Leonardo only
+  }
+  Serial.println("Initializing SD card...");
   pinMode(doorSwitch,INPUT_PULLUP);
   pinMode(signalReport, OUTPUT);
   pinMode(gprsReport, OUTPUT);
@@ -405,11 +410,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(doorSwitch), doorDetection, RISING);
   end_c[0] = 0x1a;
   end_c[1] = '\0';
-  Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
-  Serial.println("Initializing SD card...");
+
   if (!SD.begin(chipSelect)) {
     Serial.println("initialization failed!");
     return;
@@ -441,8 +442,8 @@ void setup() {
         timer.setInterval(d, reportTempAndRH);
         Serial.println("periode " +String(d));
         settingClock();
-        // reportTempAndRH();
-        // digitalWrite(signalReport, HIGH);
+        //reportTempAndRH();
+        digitalWrite(signalReport, HIGH);
         //sendImage("IMAGE107.B64", "IMAGE107.JPG");
       }
     }
@@ -831,9 +832,9 @@ int sapbrFunction(){
       return 1;
 }
 int sendImage(String filename, String imageName){
-      digitalWrite(uploadProcess, LOW);
-      char aa[apnName.length()+1];
-      apnName.toCharArray(aa, apnName.length()+1);
+    digitalWrite(uploadProcess, LOW);
+    char aa[apnName.length()+1];
+    apnName.toCharArray(aa, apnName.length()+1);
     
     if(sapbrFunction() == 1){
     Serial.println("gprs activated");
@@ -1019,11 +1020,11 @@ int sendImage(String filename, String imageName){
         digitalWrite(uploadProcess, HIGH);
         return 1;
       }
-      // else{
-      //   Serial.println("apn not configured");
-      //   digitalWrite(uploadProcess, HIGH);
-      //   return 0;
-      // }
+      else{
+        Serial.println("apn not configured");
+        digitalWrite(uploadProcess, HIGH);
+        return 0;
+      }
     } 
 }
 int transferData(long location,int dataLength, long destination, File readImage){
@@ -1132,17 +1133,39 @@ int sendNewMessage(char *number, char *message){
 int state = 0;
 
 void checkGPRSConnection(){
-  if(gsm.IsStringReceived("+PDP: DEACT")){
-    gprsDisconnect = true;
-    digitalWrite(GSM_RESET, LOW);
-    delay(105);
-    digitalWrite(GSM_RESET, HIGH);
+  gsm.SimpleWriteln("AT+CGATT?");
+  switch (gsm.WaitResp(500, 100, "OK")) {
+        case RX_TMOUT_ERR:
+          break;
+        case RX_FINISHED_STR_NOT_RECV:
+          break;
+        case RX_FINISHED_STR_RECV:
+          String aa = (char*)gsm.comm_buf;
+          int firstQuotation = aa.indexOf(':');
+          firstQuotation += 1;
+          int secondQuotation = firstQuotation + 2;
+          char buff[aa.length()];
+          aa.toCharArray(buff,aa.length());
+          String message="";
+          for(int i=firstQuotation+1;i<secondQuotation;i++){
+            message += buff[i];
+          }
+          Serial.println("gprs code: " +message);
+          int ab = message.toInt();
+          Serial.println("gprs code: " +ab);
+          if(ab == 0){
+            gprsDisconnect = true;
+            digitalWrite(GSM_RESET, LOW);
+            delay(105);
+            digitalWrite(GSM_RESET, HIGH);
 
-    if(sapbrFunction() == 1){
-      Serial.println("gprs activated");
-      gprsDisconnect = false;
-    }
-  }  
+            if(sapbrFunction() == 1){
+              Serial.println("gprs activated");
+              gprsDisconnect = false;
+            }
+          }  
+          break;
+  }
   if(!gprsDisconnect){
     digitalWrite(gprsReport, LOW);
   }
@@ -1235,7 +1258,7 @@ void checkTresholdTempRH(){
 void loop() {
   
   //send data sensor temp&rh to sms server periodic
-  timer.run();
+  //timer.run();
   
   //just check sensor temp &rh every 10 s
   timerRoutine.run();
@@ -1245,8 +1268,8 @@ void loop() {
   //reconnect gprs if disconnect
   if(millis()-prevMillis >= 60000){
     prevMillis = millis();
-    checkGPRSConnection();
     checkSignal();
+    checkGPRSConnection();
     //check new message and handle sms request
     checkNewMessage();
   }
@@ -1257,10 +1280,10 @@ void loop() {
   // state = digitalRead(doorSwitch);
   // if(state == HIGH){
   if(doorStateChange){
+    digitalWrite(doorReport, LOW);
     doorState = digitalRead(doorSwitch);
     doorStateChange = false;
     cameraEncodeUploadProses = true;
-    digitalWrite(doorReport, LOW);
     Serial.println("Door Opened");
     Serial.println("Take picture 3 times");
     boolean takePicture = false;

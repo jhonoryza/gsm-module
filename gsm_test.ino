@@ -443,6 +443,7 @@ void setup() {
         //long d = 5000;
         timer.setInterval(d, reportTempAndRH);
         Serial.println("periode " +String(d));
+        connectGPRS();
         settingClock();
         //reportTempAndRH();
         digitalWrite(signalReport, HIGH);
@@ -455,32 +456,14 @@ void setup() {
 }
 
 int settingClock(){
-  if(sapbrFunction() == 1){
-    Serial.println("gprs activated");
-    gprsDisconnect = false;
-    char aa[apnName.length()+1];
-    apnName.toCharArray(aa, apnName.length()+1);
-    Serial.println(String(aa));
-    if (net.attachGPRS(aa, "", "") == 1) {
-
-        Serial.println("apn configured");
-        if(readClockData() == 1){
-          Serial.println("clock configured");
-          return 1;
-        }
-        else{
-          Serial.println("clock not configured");
-          return 0;
-        }
+    if(readClockData() == 1){
+      Serial.println("clock configured");
+      return 1;
     }
     else{
-        Serial.println("apn not configured");
+      Serial.println("clock not configured");
+      return 0;
     }
-  }
-  else{
-    Serial.println("gprs not activated");
-    return 0;
-  }
 }
 
 int getListTextFile(){
@@ -835,15 +818,8 @@ int sapbrFunction(){
 }
 int sendImage(String filename, String imageName){
     digitalWrite(uploadProcess, LOW);
-    char aa[apnName.length()+1];
-    apnName.toCharArray(aa, apnName.length()+1);
-    
-    if(sapbrFunction() == 1){
-    Serial.println("gprs activated");
-    gprsDisconnect = false;
-      if (net.attachGPRS(aa, "", "") == 1){
-        Serial.println("apn configured");
-
+    checkGPRSConnection();
+    if(gprsDisconnect == false){
         gsm.SimpleWriteln("AT+SMTPSRV="+smtp_server+","+smtp_port);
         switch (gsm.WaitResp(500, 100, "OK")) {
         case RX_TMOUT_ERR:
@@ -1023,11 +999,10 @@ int sendImage(String filename, String imageName){
         return 1;
       }
       else{
-        Serial.println("apn not configured");
+        Serial.println("gprs disconnected, upload pending");
         digitalWrite(uploadProcess, HIGH);
         return 0;
       }
-    } 
 }
 int transferData(long location,int dataLength, long destination, File readImage){
   sprintf(aux_string,"AT+SMTPFT=%d", dataLength);
@@ -1133,7 +1108,35 @@ int sendNewMessage(char *number, char *message){
   return 1;
 }
 int state = 0;
-
+int connectGPRS(){
+  Serial.println("grps disconnected");
+  Serial.println("reconnect");
+  gprsDisconnect = true;
+  digitalWrite(GSM_RESET, LOW);
+  delay(105);
+  digitalWrite(GSM_RESET, HIGH);
+  if(sapbrFunction() == 1){
+    char aa[apnName.length()+1];
+    apnName.toCharArray(aa, apnName.length()+1);
+    Serial.println(String(aa));
+    if (net.attachGPRS(aa, "", "") == 1) {
+      gprsDisconnect = false;
+      Serial.println("apn configured");
+      Serial.println("gprs connected");
+      return 1;
+    }
+    else{
+      gprsDisconnect = true;
+      Serial.println("reconnect gprs failed");
+      return 0;
+    }
+  }
+  else{
+    gprsDisconnect = true;
+    Serial.println("reconnect gprs failed");
+    return 0;
+  }
+}
 void checkGPRSConnection(){
   gsm.SimpleWriteln("AT+CGATT?");
   switch (gsm.WaitResp(500, 100, "OK")) {
@@ -1144,35 +1147,20 @@ void checkGPRSConnection(){
         case RX_FINISHED_STR_RECV:
           String aa = (char*)gsm.comm_buf;
           int firstQuotation = aa.indexOf(':');
-          firstQuotation += 1;
-          int secondQuotation = firstQuotation + 2;
+          firstQuotation += 2;
           char buff[aa.length()];
           aa.toCharArray(buff,aa.length());
           String message="";
-          for(int i=firstQuotation+1;i<secondQuotation;i++){
-            message += buff[i];
-          }
-          Serial.println("gprs code: " +message);
-          int ab = message.toInt();
-          Serial.println("gprs code: " +ab);
-          if(ab == 0){
+          message = buff[firstQuotation];
+          if(message.toInt() == 0){
             gprsDisconnect = true;
-            digitalWrite(GSM_RESET, LOW);
-            delay(105);
-            digitalWrite(GSM_RESET, HIGH);
-
-            if(sapbrFunction() == 1){
-              Serial.println("gprs activated");
-              gprsDisconnect = false;
-            }
-          }  
+            connectGPRS();
+          } 
+          else if(message.toInt() == 1){
+            gprsDisconnect = false;
+            Serial.println("grps still connected");
+          } 
           break;
-  }
-  if(!gprsDisconnect){
-    digitalWrite(gprsReport, LOW);
-  }
-  else if(gprsDisconnect){
-    digitalWrite(gprsReport, HIGH); 
   }
 }
 
@@ -1266,7 +1254,13 @@ void loop() {
   timerRoutine.run();
   
   
-  
+  if(!gprsDisconnect){
+    digitalWrite(gprsReport, LOW);
+  }
+  else if(gprsDisconnect){
+    digitalWrite(gprsReport, HIGH); 
+  }
+
   //reconnect gprs if disconnect
   if(millis()-prevMillis >= 60000){
     prevMillis = millis();

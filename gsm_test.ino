@@ -1,4 +1,5 @@
 //GTI gsm projects
+//Updated 28 November 2015
 #include "SIM900.h"
 #include <Adafruit_VC0706.h>
 #include <SoftwareSerial.h>

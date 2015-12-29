@@ -555,9 +555,9 @@ int snapPicture(int count){
   // Set the picture size - you can choose one of 640x480, 320x240 or 160x120 
   // Remember that bigger pictures take longer to transmit!
   
-  cam.setImageSize(VC0706_640x480);        // biggest
+  //cam.setImageSize(VC0706_640x480);        // biggest
   //cam.setImageSize(VC0706_320x240);        // medium
-  //cam.setImageSize(VC0706_160x120);          // small
+  cam.setImageSize(VC0706_160x120);          // small
 
   // You can read the size back from the camera (optional, but maybe useful?)
   uint8_t imgsize = cam.getImageSize();
@@ -606,6 +606,7 @@ int snapPicture(int count){
   char buff[30];int first;
   switch (count) {
       case 1:
+        b64OneName="";
         pictureOneName = String(filename);
         pictureOneName.toCharArray(buff, 30);
         first = pictureOneName.indexOf('.');
@@ -616,6 +617,7 @@ int snapPicture(int count){
         Serial.println(pictureOneName +" : " +b64OneName);
         break;
       case 2:
+        b64TwoName="";
         pictureTwoName = String(filename);
         pictureTwoName.toCharArray(buff, 30);
         first = pictureTwoName.indexOf('.');
@@ -626,6 +628,7 @@ int snapPicture(int count){
         Serial.println(pictureTwoName +" : " +b64TwoName);
         break;
       case 3:
+        b64ThreeName="";
         pictureThreeName = String(filename);
         pictureThreeName.toCharArray(buff, 30);
         first = pictureThreeName.indexOf('.');
@@ -1453,9 +1456,13 @@ int encodeJPGToB64(String jpgFile, String b64File) {
   Serial.println("Total Line devide:" +String(line));
   digitalWrite(encodeProcess, HIGH);
   if(sendImage(b64File, jpgFile)==0){
+    digitalWrite(uploadProcess, HIGH);
+    Serial.println("upload failed / pending");
     return 0;
   }  
   else{
+    digitalWrite(uploadProcess, HIGH);
+    Serial.println("upload success");
     return 1;
   }
 }

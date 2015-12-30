@@ -639,6 +639,36 @@ int snapPicture(int count){
         Serial.println(pictureThreeName +" : " +b64ThreeName);
         break;
   }
+  
+  char listFilename[16];
+  int nrc = 1;  
+  while (nrc != 0)
+  {
+    sprintf(listFilename, "%d.txt", nrc);
+    if (SD.exists(listFilename) == false) break;
+    Serial.print(listFilename);
+    Serial.println(" exists.");
+    nrc++;
+  }
+  Serial.println("Save as: " +String(listFilename));
+  File listFile = SD.open(listFilename, FILE_WRITE);
+  if (listFile){
+    listFile.println(filename);
+
+    char sementara[30];
+    String b64filename="";
+    String picfilename = String(filename);
+    picfilename.toCharArray(sementara, 30);
+    int first = picfilename.indexOf('.');
+    for(int m=0;m<first;m++){
+      b64filename += sementara[m];
+    }
+    b64filename += ".b64";
+
+    listFile.println(b64filename);
+  }
+  listFile.close();
+
   // Open the file for writing
   File imgFile = SD.open(filename, FILE_WRITE);
   
@@ -956,7 +986,7 @@ int sendImage(String filename, String imageName){
         // gsm.WaitResp(3000, 100, "+SMTPFT: 1,1360");
         // delay(500);
         // gsm.WaitResp(5000, 100);
-        switch (gsm.WaitResp(3000, 100, "+SMTPFT: 1,1360")){
+        switch (gsm.WaitResp(6000, 100, "+SMTPFT: 1,1360")){
           case RX_TMOUT_ERR:
           Serial.println("prepared timeout");
           return 0;
@@ -1307,46 +1337,96 @@ void loop() {
     digitalWrite(doorReport, LOW);
     doorState = digitalRead(doorSwitch);
     doorStateChange = false;
-    cameraEncodeUploadProses = true;
+    // cameraEncodeUploadProses = true;
     Serial.println("Door Opened");
     Serial.println("Take picture 3 times");
-    boolean takePicture = false;
+    // boolean takePicture = false;
     
     for(int m=0;m<3;m++){
       if(snapPicture(m+1)==1){
         Serial.println("Picture 0" +String(m+1) +" Taken");
-        takePicture = true;
+        // takePicture = true;
       }
       else{
         Serial.println("Picture 0" +String(m+1) +" not Taken");
-        takePicture = false;
+        // takePicture = false;
       }
     }
-    if(takePicture){
-      for(int m=0;m<3;m++){
-        switch (m) {
-            case 0:
-              if(encodeJPGToB64(pictureOneName, b64OneName) == 0)
-              m=3;
-              break;
-            case 1:
-              if(encodeJPGToB64(pictureTwoName, b64TwoName) == 0)
-              m=3;
-              break;
-            case 2:
-              if(encodeJPGToB64(pictureThreeName, b64ThreeName) == 0)
-              m=3;
-              break;
-        }
-      }
-    }
-    cameraEncodeUploadProses = true;
+    // if(takePicture){
+    //   for(int m=0;m<3;m++){
+    //     switch (m) {
+    //         case 0:
+    //           if(encodeJPGToB64(pictureOneName, b64OneName) == 0)
+    //           m=3;
+    //           break;
+    //         case 1:
+    //           if(encodeJPGToB64(pictureTwoName, b64TwoName) == 0)
+    //           m=3;
+    //           break;
+    //         case 2:
+    //           if(encodeJPGToB64(pictureThreeName, b64ThreeName) == 0)
+    //           m=3;
+    //           break;
+    //     }
+    //   }
+    // }
+    // cameraEncodeUploadProses = true;
   }
   else if(!doorStateChange){
     digitalWrite(doorReport, HIGH);
   }
+
+  checkListFile();
 }
 
+void checkListFile(){
+  char listFilename[16];
+  int nrc = 1;  
+  while (nrc != 0)
+  {
+    sprintf(listFilename, "%d.txt", nrc);
+    if(nrc >= 300) 
+      break;
+    else if (!SD.exists(listFilename)) 
+      nrc++;
+    else if (SD.exists(listFilename)){
+      Serial.print(listFilename);
+      Serial.println(" exists.");
+      doEncodeAndUpload(listFilename);
+      break;
+    }
+  }
+}
+
+int doEncodeAndUpload(char listFilename[16]){
+  char(temp);
+  String tempData[3];
+  int counter = 0;
+  File settingsFile = SD.open(listFilename, FILE_READ);
+  if(settingsFile){
+    Serial.println("list file " +String(listFilename) +" read");
+    while(settingsFile.available()){
+      temp = settingsFile.read();
+      if(temp != '\n'){
+        tempData[counter] += temp;
+      }  
+      else{
+        counter++;      
+      }
+    }
+  }
+  settingsFile.close();
+  tempData[0].remove((tempData[0].length()-1));
+  tempData[1].remove((tempData[1].length()-1));
+  if(SD.exists(tempData[0])){
+    if(encodeJPGToB64(tempData[0], tempData[1]) == 1){
+      SD.remove(listFilename);
+    }
+  }
+  else{
+    SD.remove(listFilename);
+  }
+}
 void serialhwread()
 {
   int i = 0;
@@ -1398,47 +1478,46 @@ int encodeJPGToB64(String jpgFile, String b64File) {
  unsigned char in[3],out[4]; int i,len,blocksout=0;
  me = ""; mm=0; chara=0; 
  File picture = SD.open(jpgFile, FILE_READ);
- if(SD.exists(b64File)){
-    SD.remove(b64File);
- }
- File encodeFile = SD.open(b64File, FILE_WRITE);
-
  digitalWrite(encodeProcess, LOW);
  int32_t time = millis();
  Serial.println("start encoding file " +jpgFile +" to " +b64File);
- while (picture.available()!=0) {
-   len=0; 
-   for (i=0;i<3;i++) {
-    in[i]=(unsigned char) 
-    picture.read(); 
-    if (picture.available()!=0)
-    len++; else in[i]=0; 
+ if(picture){
+  if(SD.exists(b64File)){
+    SD.remove(b64File);
+  }
+  File encodeFile = SD.open(b64File, FILE_WRITE);
+   while (picture.available()!=0) {
+     len=0; 
+     for (i=0;i<3;i++) {
+      in[i]=(unsigned char) 
+      picture.read(); 
+      if (picture.available()!=0)
+      len++; else in[i]=0; 
+     }
+     if (len) {
+      encodeblock(in, out, len); 
+      for (i = 0; i < 4; i++){ 
+        chara++;
+        encodeFile.write(out[i]); 
+        //Serial.write(out[i]);
+      } 
+      blocksout++; 
+     }
+     if (blocksout >= 19 || picture.available() == 0) { 
+      if (blocksout){ 
+        mm++; chara+=2;
+        encodeFile.print("\r\n"); 
+        //Serial.print("\r\n");
+        Serial.print(".");
+      } 
+      blocksout = 0;
+     }
+     //Serial.print(".");
    }
-   if (len) {
-    encodeblock(in, out, len); 
-    for (i = 0; i < 4; i++){ 
-      chara++;
-      encodeFile.write(out[i]); 
-      //Serial.write(out[i]);
-    } 
-    blocksout++; 
-   }
-   if (blocksout >= 19 || picture.available() == 0) { 
-    if (blocksout){ 
-      mm++; chara+=2;
-      encodeFile.print("\r\n"); 
-      //Serial.print("\r\n");
-      Serial.print(".");
-    } 
-    blocksout = 0;
-   }
-   //Serial.print(".");
- }
  Serial.println("encode done.");
  picture.close();
  encodeFile.close();
-
-  time = millis() - time;
+ time = millis() - time;
   time = time/1000;
   Serial.println("done!");
   Serial.print(time); Serial.println(" s encoded");
@@ -1455,14 +1534,19 @@ int encodeJPGToB64(String jpgFile, String b64File) {
   }
   Serial.println("Total Line devide:" +String(line));
   digitalWrite(encodeProcess, HIGH);
-  if(sendImage(b64File, jpgFile)==0){
-    digitalWrite(uploadProcess, HIGH);
-    Serial.println("upload failed / pending");
+   if(sendImage(b64File, jpgFile)==0){
+      digitalWrite(uploadProcess, HIGH);
+      Serial.println("upload failed / pending");
+      return 0;
+    }  
+    else{
+      digitalWrite(uploadProcess, HIGH);
+      Serial.println("upload success");
+      return 1;
+    }
+ }
+ else{
+    Serial.println("encode failed, file image not opened");  
     return 0;
-  }  
-  else{
-    digitalWrite(uploadProcess, HIGH);
-    Serial.println("upload success");
-    return 1;
-  }
+ }  
 }

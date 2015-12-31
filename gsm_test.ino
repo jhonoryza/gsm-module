@@ -422,6 +422,17 @@ void setup() {
   // readImage = SD.open("IMAGE00.b64", FILE_READ);
   // readImage.close();
 
+  startDevice();
+
+  digitalWrite(signalReport, LOW);
+
+  if (started) {
+    setDevice();
+  }
+ 
+ 
+}
+void startDevice(){
   Serial.println("Start GSM Shield");
   if (gsm.begin(9600)) {
     Serial.println("status=READY");
@@ -429,12 +440,9 @@ void setup() {
   }
   else
     Serial.println("status=IDLE");
-
-
-  digitalWrite(signalReport, LOW);
-
-  if (started) {
-    if(getListTextFile() == 1){
+}
+void setDevice(){
+  if(getListTextFile() == 1){
       if(readDeviceSettings() == 1){
         //setting timer suhu dan rh in miliseconds
         char buff[50];
@@ -450,11 +458,7 @@ void setup() {
         //sendImage("IMAGE107.B64", "IMAGE107.JPG");
       }
     }
-  }
- 
- 
 }
-
 int settingClock(){
     if(readClockData() == 1){
       Serial.println("clock configured");
@@ -1305,78 +1309,84 @@ void checkTresholdTempRH(){
 }
 void loop() {
   
-  //send data sensor temp&rh to sms server periodic
-  //timer.run();
-  
-  //just check sensor temp &rh every 10 s
-  timerRoutine.run();
-  
-  
-  if(!gprsDisconnect){
-    digitalWrite(gprsReport, LOW);
-  }
-  else if(gprsDisconnect){
-    digitalWrite(gprsReport, HIGH); 
-  }
-
-  //reconnect gprs if disconnect
-  if(millis()-prevMillis >= 60000){
-    prevMillis = millis();
-    checkSignal();
-    checkGPRSConnection();
-    //check new message and handle sms request
-    checkNewMessage();
-  }
-
-    serialhwread();
-    serialswread();
-
-  // state = digitalRead(doorSwitch);
-  // if(state == HIGH){
-  if(doorStateChange){
-    digitalWrite(doorReport, LOW);
-    doorState = digitalRead(doorSwitch);
-    doorStateChange = false;
-    // cameraEncodeUploadProses = true;
-    Serial.println("Door Opened");
-    Serial.println("Take picture 3 times");
-    // boolean takePicture = false;
+  if(started){
+    //send data sensor temp&rh to sms server periodic
+    //timer.run();
     
-    for(int m=0;m<3;m++){
-      if(snapPicture(m+1)==1){
-        Serial.println("Picture 0" +String(m+1) +" Taken");
-        // takePicture = true;
-      }
-      else{
-        Serial.println("Picture 0" +String(m+1) +" not Taken");
-        // takePicture = false;
-      }
+    //just check sensor temp &rh every 10 s
+    timerRoutine.run();
+    
+    
+    if(!gprsDisconnect){
+      digitalWrite(gprsReport, LOW);
     }
-    // if(takePicture){
-    //   for(int m=0;m<3;m++){
-    //     switch (m) {
-    //         case 0:
-    //           if(encodeJPGToB64(pictureOneName, b64OneName) == 0)
-    //           m=3;
-    //           break;
-    //         case 1:
-    //           if(encodeJPGToB64(pictureTwoName, b64TwoName) == 0)
-    //           m=3;
-    //           break;
-    //         case 2:
-    //           if(encodeJPGToB64(pictureThreeName, b64ThreeName) == 0)
-    //           m=3;
-    //           break;
-    //     }
-    //   }
-    // }
-    // cameraEncodeUploadProses = true;
-  }
-  else if(!doorStateChange){
-    digitalWrite(doorReport, HIGH);
-  }
+    else if(gprsDisconnect){
+      digitalWrite(gprsReport, HIGH); 
+    }
 
-  checkListFile();
+    //reconnect gprs if disconnect
+    if(millis()-prevMillis >= 60000){
+      prevMillis = millis();
+      checkSignal();
+      checkGPRSConnection();
+      //check new message and handle sms request
+      checkNewMessage();
+    }
+
+      serialhwread();
+      serialswread();
+
+    // state = digitalRead(doorSwitch);
+    // if(state == HIGH){
+    if(doorStateChange){
+      digitalWrite(doorReport, LOW);
+      doorState = digitalRead(doorSwitch);
+      doorStateChange = false;
+      // cameraEncodeUploadProses = true;
+      Serial.println("Door Opened");
+      Serial.println("Take picture 3 times");
+      // boolean takePicture = false;
+      
+      for(int m=0;m<3;m++){
+        if(snapPicture(m+1)==1){
+          Serial.println("Picture 0" +String(m+1) +" Taken");
+          // takePicture = true;
+        }
+        else{
+          Serial.println("Picture 0" +String(m+1) +" not Taken");
+          // takePicture = false;
+        }
+      }
+      // if(takePicture){
+      //   for(int m=0;m<3;m++){
+      //     switch (m) {
+      //         case 0:
+      //           if(encodeJPGToB64(pictureOneName, b64OneName) == 0)
+      //           m=3;
+      //           break;
+      //         case 1:
+      //           if(encodeJPGToB64(pictureTwoName, b64TwoName) == 0)
+      //           m=3;
+      //           break;
+      //         case 2:
+      //           if(encodeJPGToB64(pictureThreeName, b64ThreeName) == 0)
+      //           m=3;
+      //           break;
+      //     }
+      //   }
+      // }
+      // cameraEncodeUploadProses = true;
+    }
+    else if(!doorStateChange){
+      digitalWrite(doorReport, HIGH);
+    }
+
+    checkListFile();
+  }
+  else if(!started){
+    startDevice();
+    setDevice();
+  }
 }
 
 void checkListFile(){
